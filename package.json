@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Debug adapter for CMSIS following the DAP protocol",
   "author": "Rob Moran <rob.moran@arm.com>",
+  "license": "MIT",
   "private": true,
   "main": "./lib/index",
   "repository": {
