@@ -1,0 +1,179 @@
+{
+  "name": "cmsis-debug-adapter",
+  "version": "1.0.0",
+  "description": "Debug adapter for CMSIS following the DAP protocol",
+  "author": "Rob Moran <rob.moran@arm.com>",
+  "private": true,
+  "main": "./lib/index",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/ARMmbed/cmsis-debug-adapter"
+  },
+  "engines": {
+    "node": ">=10.2.1"
+  },
+  "scripts": {
+    "prepare": "yarn run build",
+    "build": "tsc",
+    "watch": "tsc -w",
+    "lint": "tslint --fix --project tsconfig.json"
+  },
+  "dependencies": {
+    "cdt-gdb-adapter": "ARMMbed/cdt-gdb-adapter#build",
+    "vscode-debugadapter": "^1.26.0",
+    "vscode-debugprotocol": "^1.26.0"
+  },
+  "devDependencies": {
+    "@types/node": "~10.3.6",
+    "tslint": "^5.9.1",
+    "tslint-eslint-rules": "^4.1.1",
+    "typescript": "^3.1.6"
+  },
+  "bundledDependencies": [
+    "cdt-gdb-adapter"
+  ],
+  "publisher": "Arm Mbed",
+  "activationEvents": [
+    "onDebugResolve:cmsis-debug"
+  ],
+  "contributes": {
+    "breakpoints": [
+      {
+        "language": "c"
+      },
+      {
+        "language": "cpp"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "cmsis-debug",
+        "label": "CMSIS Debug",
+        "program": "./lib/index.js",
+        "runtime": "node",
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Path to the program to be launched",
+                "default": "${workspaceFolder}/${command:askProgramPath}"
+              },
+              "arguments": {
+                "type": "string",
+                "description": "Arguments for the program"
+              },
+              "runToMain": {
+                "description": "If enabled the debugger will run until the start of the main function.",
+                "type": "boolean",
+                "default": false
+              },
+              "gdb": {
+                "type": "string",
+                "description": "Path to gdb",
+                "default": "arm-none-eabi-gdb"
+              },
+              "gdbArguments": {
+                "description": "Additional arguments to pass to GDB command line",
+                "type": "array",
+                "default": []
+              },
+              "gdbServer": {
+                "type": "string",
+                "description": "Path to gdb server",
+                "default": "pyocd"
+              },
+              "gdbServerArguments": {
+                "description": "Additional arguments to pass to GDB server",
+                "type": "array",
+                "default": []
+              },
+              "objdump": {
+                "type": "string",
+                "description": "Path to objdump executable",
+                "default": "arm-none-eabi-objdump"
+              },
+              "initCommands": {
+                "description": "Extra gdb commands to run after initialisation",
+                "type": "array",
+                "default": []
+              },
+              "verbose": {
+                "type": "boolean",
+                "description": "Produce verbose log output",
+                "default": "false"
+              }
+            }
+          },
+          "attach": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Path to the program to be launched",
+                "default": "${workspaceFolder}/${command:askProgramPath}"
+              },
+              "arguments": {
+                "type": "string",
+                "description": "Arguments for the program"
+              },
+              "runToMain": {
+                "description": "If enabled the debugger will run until the start of the main function.",
+                "type": "boolean",
+                "default": false
+              },
+              "gdb": {
+                "type": "string",
+                "description": "Path to gdb",
+                "default": "arm-none-eabi-gdb"
+              },
+              "gdbArguments": {
+                "description": "Additional arguments to pass to GDB command line",
+                "type": "array",
+                "default": []
+              },
+              "gdbServer": {
+                "type": "string",
+                "description": "Path to gdb server",
+                "default": "pyocd"
+              },
+              "gdbServerArguments": {
+                "description": "Additional arguments to pass to GDB server",
+                "type": "array",
+                "default": []
+              },
+              "objdump": {
+                "type": "string",
+                "description": "Path to objdump executable",
+                "default": "arm-none-eabi-objdump"
+              },
+              "initCommands": {
+                "description": "Extra gdb commands to run after initialisation",
+                "type": "array",
+                "default": []
+              },
+              "verbose": {
+                "type": "boolean",
+                "description": "Produce verbose log output",
+                "default": "false"
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "cmsis-debug",
+            "name": "CMSIS Debug",
+            "request": "launch",
+            "program": "./bin/executable.elf"
+          }
+        ]
+      }
+    ]
+  }
+}

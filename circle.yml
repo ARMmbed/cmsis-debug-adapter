@@ -1,0 +1,32 @@
+version: 2.1
+
+jobs:
+  build:
+    docker:
+      - image: circleci/node:10.2.1-stretch
+    steps:
+      - checkout
+      - run: yarn --frozen-lockfile
+      - run: yarn build
+      - persist_to_workspace:
+          root: ../
+          paths:
+            - project
+
+  deploy:
+    docker:
+      - image: cibuilds/github:0.10
+    steps:
+      - attach_workspace:
+          at: ./
+      - run: tar cvzf package.tgz project
+      - run: ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete -replace ${CIRCLE_BRANCH} ./package.tgz
+
+workflows:
+  version: 2
+  commit:
+    jobs:
+      - build
+      - deploy:
+          requires:
+            - build
