@@ -30,10 +30,10 @@ const maxBuffer = 2 * 1024 * 1024;
 
 export class PortScanner {
 
-    public async findFreePort(start: number = 50000, end: number = 50100): Promise<number | undefined> {
-        const fn = this.getFunction();
+    public async findFreePort(start: number = 50000, length: number = 100): Promise<number | undefined> {
+        const fn = this.getFunction().bind(this);
 
-        for (let i = start; i <= end; i++) {
+        for (let i = start; i <= start + length; i++) {
             try {
                 // Try to find pid of port
                 await fn(i);
@@ -158,9 +158,9 @@ export class PortScanner {
         return idx > 0 ? text.substring(idx) : text;
     }
 
-    private extractColumns(text: string, idxes: number[], max: number): string[] {
+    private extractColumns(text: string, idxes: number[], max: number): string[][] {
         const lines = text.split(/(\r\n|\n|\r)/);
-        const columns: string[] = [];
+        const columns: string[][] = [];
 
         if (!max) {
             max = Math.max.apply(null, idxes) + 1;
@@ -174,7 +174,7 @@ export class PortScanner {
                 column.push(cols[idx] || '');
             });
 
-            columns.concat(column);
+            columns.push(column);
         });
 
         return columns;

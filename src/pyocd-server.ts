@@ -26,10 +26,15 @@
 import { AbstractServer } from './abstract-server';
 
 const LAUNCH_REGEX = /GDB server started/;
+const ERROR_REGEX = /:ERROR:gdbserver:/;
 
 export class PyocdServer extends AbstractServer {
 
     protected serverStarted(data: string): boolean {
         return LAUNCH_REGEX.test(data);
+    }
+
+    protected serverError(data: string): boolean {
+        return ERROR_REGEX.test(data);
     }
 }

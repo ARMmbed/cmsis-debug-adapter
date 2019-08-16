@@ -24,10 +24,13 @@
 * SOFTWARE.
 */
 
+import { EOL } from 'os';
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import { dirname } from 'path';
 import { CmsisRequestArguments } from './cmsis-debug-session';
+
+const TIMEOUT = 1000 * 10; // 10 seconds
 
 export abstract class AbstractServer extends EventEmitter {
 
@@ -36,6 +39,7 @@ export abstract class AbstractServer extends EventEmitter {
     protected errBuffer: string = '';
     protected launchResolve?: () => void;
     protected launchReject?: (error: any) => void;
+    protected timer?: NodeJS.Timer;
 
     public spawn(args: CmsisRequestArguments): Promise<void> {
         return new Promise(async (resolve, reject) => {
@@ -43,24 +47,27 @@ export abstract class AbstractServer extends EventEmitter {
             this.launchReject = reject;
 
             try {
+                this.timer = setTimeout(() => this.onSpawnError(new Error('Timeout waiting for gdb server to start')), TIMEOUT);
                 const command = args.gdbServer || 'gdb-server';
                 this.process = spawn(command, args.gdbServerArguments, {
                     cwd: dirname(command),
                 });
 
-                if (this.process) {
-                    this.process.on('exit', this.onExit.bind(this));
-                    this.process.on('error', this.onError.bind(this));
+                if (!this.process) {
+                    throw new Error('Unable to spawn gdb server');
+                }
 
-                    if (this.process.stdout) {
-                        this.process.stdout.on('data', this.onStdout.bind(this));
-                    }
-                    if (this.process.stderr) {
-                        this.process.stderr.on('data', this.onStderr.bind(this));
-                    }
+                this.process.on('exit', this.onExit.bind(this));
+                this.process.on('error', this.onSpawnError.bind(this));
+
+                if (this.process.stdout) {
+                    this.process.stdout.on('data', this.onStdout.bind(this));
+                }
+                if (this.process.stderr) {
+                    this.process.stderr.on('data', this.onStderr.bind(this));
                 }
             } catch (error) {
-                return reject(error);
+                this.onSpawnError(error);
             }
         });
     }
@@ -73,48 +80,66 @@ export abstract class AbstractServer extends EventEmitter {
 
     protected onExit(code: number, signal: string) {
         this.emit('exit', code, signal);
+
+        // Code can be undefined, null or 0 and we want to ignore those values
+        if (!!code) {
+            this.emit('error', `GDB server stopped unexpectedly with exit code ${code}`);
+        }
     }
 
-    protected onError(error: Error) {
-        this.emit('error', error);
-
+    protected onSpawnError(error: Error) {
         if (this.launchReject) {
+            this.clearTimer();
             this.launchReject(error);
-            this.clearPromise();
+            this.clearPromises();
         }
     }
 
     protected onStdout(chunk: string | Buffer) {
-        this.onData(chunk, this.outBuffer);
+        this.onData(chunk, this.outBuffer, 'stdout');
     }
 
     protected onStderr(chunk: string | Buffer) {
-        this.onData(chunk, this.errBuffer);
+        this.onData(chunk, this.errBuffer, 'stderr');
     }
 
-    protected onData(chunk: string | Buffer, buffer: string) {
+    protected onData(chunk: string | Buffer, buffer: string, event: string) {
         buffer += typeof chunk === 'string' ? chunk
                 : chunk.toString('utf8');
 
         const end = buffer.lastIndexOf('\n');
         if (end !== -1) {
-            this.handleData(buffer.substring(0, end));
+            const data = buffer.substring(0, end);
+            this.emit(event, data);
+            this.handleData(data);
             buffer = buffer.substring(end + 1);
         }
     }
 
     protected handleData(data: string) {
-        this.emit('data', data);
         if (this.launchResolve && this.serverStarted(data)) {
+            this.clearTimer();
             this.launchResolve();
-            this.clearPromise();
+            this.clearPromises();
+        }
+
+        if (this.serverError(data)) {
+            this.emit('error', data.split(EOL)[0]);
         }
     }
 
-    protected clearPromise() {
+    protected clearTimer() {
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = undefined;
+        }
+    }
+
+    protected clearPromises() {
         this.launchResolve = undefined;
         this.launchReject = undefined;
     }
 
     protected abstract serverStarted(data: string): boolean;
+    protected abstract serverError(data: string): boolean;
 }

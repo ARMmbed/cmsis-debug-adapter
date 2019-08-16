@@ -25,7 +25,7 @@
 
 import { normalize } from 'path';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { Logger, logger, InitializedEvent, OutputEvent, Scope } from 'vscode-debugadapter';
+import { Logger, logger, InitializedEvent, OutputEvent, Scope, TerminatedEvent } from 'vscode-debugadapter';
 import { GDBDebugSession, RequestArguments, FrameVariableReference, FrameReference } from 'cdt-gdb-adapter/dist/GDBDebugSession';
 import { GDBBackend } from 'cdt-gdb-adapter/dist/GDBBackend';
 import { CmsisBackend } from './cmsis-backend';
@@ -52,76 +52,28 @@ export class CmsisDebugSession extends GDBDebugSession {
     protected portScanner = new PortScanner();
     protected symbolTable!: SymbolTable;
     protected globalHandle!: number;
+    protected downloadProgress = 0;
 
     protected createBackend(): GDBBackend {
         return new CmsisBackend();
     }
 
-    protected async attachRequest(response: DebugProtocol.AttachResponse, args: CmsisRequestArguments): Promise<void> {
-        try {
-            await this.runRequest(args);
-            this.sendResponse(response);
-        } catch (err) {
-            this.sendErrorResponse(response, 1, err.message);
-        }
-    }
-
     protected async launchRequest(response: DebugProtocol.LaunchResponse, args: CmsisRequestArguments): Promise<void> {
         try {
-            await this.runRequest(args);
+            await this.runSession(args);
             this.sendResponse(response);
         } catch (err) {
             this.sendErrorResponse(response, 1, err.message);
         }
     }
 
-    protected async runRequest(args: CmsisRequestArguments): Promise<void> {
-        logger.setup(args.verbose ? Logger.LogLevel.Verbose : Logger.LogLevel.Warn, args.logFile || false);
-
-        this.gdb.on('consoleStreamOutput', (output, category) => this.sendEvent(new OutputEvent(output, category)));
-        this.gdb.on('execAsync', (resultClass, resultData) => this.handleGDBAsync(resultClass, resultData));
-        this.gdb.on('notifyAsync', (resultClass, resultData) => this.handleGDBNotify(resultClass, resultData));
-
-        this.symbolTable = new SymbolTable(args.program, args.objdump);
-        await this.symbolTable.loadSymbols();
-
-        const port = await this.portScanner.findFreePort();
-        if (!port) {
-            return;
+    protected async attachRequest(response: DebugProtocol.AttachResponse, args: CmsisRequestArguments): Promise<void> {
+        try {
+            await this.runSession(args);
+            this.sendResponse(response);
+        } catch (err) {
+            this.sendErrorResponse(response, 1, err.message);
         }
-
-        const remote = `localhost:${port}`;
-
-        // Set gdb arguments
-        if (!args.gdbArguments) {
-            args.gdbArguments = [];
-        }
-        args.gdbArguments.push('-q', args.program);
-
-        // Set gdb server arguments
-        if (!args.gdbServerArguments) {
-            args.gdbServerArguments = [];
-        }
-        args.gdbServerArguments.push('--port', port.toString());
-
-        // Start gdb client and server
-        await this.gdbServer.spawn(args);
-        await this.spawn(args);
-
-        // Send commands
-        await mi.sendTargetAsyncOn(this.gdb);
-        await mi.sendTargetSelectRemote(this.gdb, remote);
-        await mi.sendMonitorResetHalt(this.gdb);
-        await mi.sendTargetDownload(this.gdb);
-        await mi.sendMonitorResetHalt(this.gdb);
-        await this.gdb.sendEnablePrettyPrint();
-
-        if (args.runToMain === true) {
-            await mi.sendBreakOnFunction(this.gdb);
-        }
-
-        this.sendEvent(new OutputEvent(`attached to remote ${remote}`));
-        this.sendEvent(new InitializedEvent());
     }
 
     protected async configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse): Promise<void> {
@@ -143,46 +95,54 @@ export class CmsisDebugSession extends GDBDebugSession {
     }
 
     protected async stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments): Promise<void> {
-        this.globalHandle = this.frameHandles.create({
-            threadId: -1,
-            frameId: -1
-        });
+        try {
+            this.globalHandle = this.frameHandles.create({
+                threadId: -1,
+                frameId: -1
+            });
 
-        return super.stackTraceRequest(response, args);
+            return super.stackTraceRequest(response, args);
+        } catch (err) {
+            this.sendErrorResponse(response, 1, err.message);
+        }
     }
 
     protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments): void {
-        const frame: FrameVariableReference = {
-            type: 'frame',
-            frameHandle: args.frameId,
-        };
+        try {
+            const frame: FrameVariableReference = {
+                type: 'frame',
+                frameHandle: args.frameId,
+            };
 
-        response.body = {
-            scopes: [
-                new Scope('Local', this.variableHandles.create(frame), false),
-                new Scope('Global', GLOBAL_HANDLE_ID, false),
-                new Scope('Static', STATIC_HANDLES_START + parseInt(args.frameId as any, 10), false)
-            ],
-        };
+            response.body = {
+                scopes: [
+                    new Scope('Local', this.variableHandles.create(frame), false),
+                    new Scope('Global', GLOBAL_HANDLE_ID, false),
+                    new Scope('Static', STATIC_HANDLES_START + parseInt(args.frameId as any, 10), false)
+                ],
+            };
 
-        this.sendResponse(response);
+            this.sendResponse(response);
+        } catch (err) {
+            this.sendErrorResponse(response, 1, err.message);
+        }
     }
 
     protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments): Promise<void> {
-        response.body = {
-            variables: new Array<DebugProtocol.Variable>()
-        };
-
         try {
+            response.body = {
+                variables: new Array<DebugProtocol.Variable>()
+            };
+
             const ref = this.variableHandles.get(args.variablesReference);
 
             if (args.variablesReference === GLOBAL_HANDLE_ID) {
                 // Use hardcoded global handle to load and store global variables
-                response.body.variables = await this.globalVariablesRequest(this.globalHandle);
+                response.body.variables = await this.getGlobalVariables(this.globalHandle);
             } else if (args.variablesReference >= STATIC_HANDLES_START && args.variablesReference <= STATIC_HANDLES_FINISH) {
                 // Use STATIC_HANDLES_START to shift the framehandles back
                 const frameHandle = args.variablesReference - STATIC_HANDLES_START;
-                response.body.variables = await this.staticVariablesRequest(frameHandle);
+                response.body.variables = await this.getStaticVariables(frameHandle);
             } else if (ref && ref.type === 'frame') {
                 // List variables for current frame
                 response.body.variables = await this.handleVariableRequestFrame(ref);
@@ -197,7 +157,110 @@ export class CmsisDebugSession extends GDBDebugSession {
         }
     }
 
-    protected async globalVariablesRequest(frameHandle: number): Promise<DebugProtocol.Variable[]> {
+    protected async evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): Promise<void> {
+        try {
+            if (args.context === 'repl') {
+                const command = args.expression;
+                const output = await mi.sendUserInput(this.gdb, command);
+                if (typeof output === 'undefined') {
+                    response.body = {
+                        result: '',
+                        variablesReference: 0
+                    };
+                } else {
+                    response.body = {
+                        result: JSON.stringify(output),
+                        variablesReference: 0
+                    };
+                }
+
+                this.sendResponse(response);
+            } else {
+                return super.evaluateRequest(response, args);
+            }
+        } catch (err) {
+            this.sendErrorResponse(response, 1, err.message);
+        }
+    }
+
+    protected async disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments): Promise<void> {
+        try {
+            this.gdbServer.kill();
+            this.sendEvent(new TerminatedEvent(args && args.restart));
+            return super.disconnectRequest(response, args);
+        } catch (err) {
+            this.sendErrorResponse(response, 1, err.message);
+        }
+    }
+
+    private async runSession(args: CmsisRequestArguments): Promise<void> {
+        logger.setup(args.verbose ? Logger.LogLevel.Verbose : Logger.LogLevel.Warn, args.logFile || false);
+
+        this.gdb.on('consoleStreamOutput', (output, category) => this.sendEvent(new OutputEvent(output, category)));
+        this.gdb.on('execAsync', (resultClass, resultData) => this.handleGDBAsync(resultClass, resultData));
+        this.gdb.on('notifyAsync', (resultClass, resultData) => this.handleGDBNotify(resultClass, resultData));
+
+        // gdb server has main info channel on stderr
+        this.gdbServer.on('stderr', data => this.sendEvent(new OutputEvent(data, 'stdout')));
+        this.gdbServer.on('error', message => {
+            this.sendEvent(new TerminatedEvent());
+            throw message;
+        });
+
+        this.symbolTable = new SymbolTable(args.program, args.objdump);
+        await this.symbolTable.loadSymbols();
+
+        const port = await this.portScanner.findFreePort();
+        if (!port) {
+            throw new Error('Unable to find a free port to use for debugging');
+        }
+        this.sendEvent(new OutputEvent(`Selected port ${port} for debugging`));
+
+        const remote = `localhost:${port}`;
+
+        // Set gdb arguments
+        if (!args.gdbArguments) {
+            args.gdbArguments = [];
+        }
+        args.gdbArguments.push('-q', args.program);
+
+        // Set gdb server arguments
+        if (!args.gdbServerArguments) {
+            args.gdbServerArguments = [];
+        }
+        args.gdbServerArguments.push('--port', port.toString());
+
+        // Start gdb client and server
+        this.progressEvent(0, 'Starting Debugger');
+        await this.gdbServer.spawn(args);
+        await this.spawn(args);
+        this.sendEvent(new OutputEvent(`Attached to debugger on port ${port}`));
+
+        // Send commands
+        await mi.sendTargetAsyncOn(this.gdb);
+        await mi.sendTargetSelectRemote(this.gdb, remote);
+        await mi.sendMonitorResetHalt(this.gdb);
+
+        // Download image
+        this.progressEvent(0, 'Loading Image');
+        this.downloadProgress = 0;
+        this.gdb.on('statusAsync', this.downloadStatus.bind(this));
+        await mi.sendTargetDownload(this.gdb);
+        this.gdb.off('statusAsync', this.downloadStatus.bind(this));
+        this.progressEvent(100, 'Loading Image');
+
+        await mi.sendMonitorResetHalt(this.gdb);
+        await this.gdb.sendEnablePrettyPrint();
+
+        if (args.runToMain === true) {
+            await mi.sendBreakOnFunction(this.gdb);
+        }
+
+        this.sendEvent(new OutputEvent(`Image loaded: ${args.program}`));
+        this.sendEvent(new InitializedEvent());
+    }
+
+    private async getGlobalVariables(frameHandle: number): Promise<DebugProtocol.Variable[]> {
         const frame = this.frameHandles.get(frameHandle);
         const symbolInfo = this.symbolTable.getGlobalVariables();
         const variables: DebugProtocol.Variable[] = [];
@@ -211,7 +274,7 @@ export class CmsisDebugSession extends GDBDebugSession {
         return variables;
     }
 
-    protected async staticVariablesRequest(frameHandle: number): Promise<DebugProtocol.Variable[]> {
+    private async getStaticVariables(frameHandle: number): Promise<DebugProtocol.Variable[]> {
         const frame = this.frameHandles.get(frameHandle);
         const result = await mi.sendStackInfoFrame(this.gdb, frame.threadId, frame.frameId);
         const file = normalize(result.frame.file || '');
@@ -231,7 +294,7 @@ export class CmsisDebugSession extends GDBDebugSession {
         return variables;
     }
 
-    protected async getVariables(frame: FrameReference, name: string, expression: string, depth: number): Promise<DebugProtocol.Variable> {
+    private async getVariables(frame: FrameReference, name: string, expression: string, depth: number): Promise<DebugProtocol.Variable> {
         let global = varMgr.getVar(frame.frameId, frame.threadId, depth, name);
 
         if (global) {
@@ -251,6 +314,7 @@ export class CmsisDebugSession extends GDBDebugSession {
 
             global = varMgr.addVar(frame.frameId, frame.threadId, depth, name, true, false, varCreateResponse);
         }
+
         return {
             name: expression,
             value: (global.value === void 0) ? '<unknown>' : global.value,
@@ -265,30 +329,30 @@ export class CmsisDebugSession extends GDBDebugSession {
         };
     }
 
-    protected async evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): Promise<void> {
-        if (args.context === 'repl') {
+    private downloadStatus(resultClass: string, resultData: any) {
+        if (resultClass === 'download') {
             try {
-                const command = args.expression;
-                const output = await mi.sendUserInput(this.gdb, command);
-                if (typeof output === 'undefined') {
-                    response.body = {
-                        result: '',
-                        variablesReference: 0
-                    };
-                } else {
-                    response.body = {
-                        result: JSON.stringify(output),
-                        variablesReference: 0
-                    };
+                if (resultData['total-size']) {
+                    const size = parseInt(resultData['total-size'], 10);
+
+                    if (resultData['total-sent']) {
+                        this.downloadProgress = parseInt(resultData['total-sent'], 10);
+                    } else if (resultData['section-size']) {
+                        this.downloadProgress += parseInt(resultData['section-size'], 10);
+                    }
+
+                    const percent = Math.round(this.downloadProgress * 100 / size);
+                    this.progressEvent(percent, 'Loading Image');
                 }
-                this.sendResponse(response);
-            } catch (error) {
-                this.sendErrorResponse(response, 8, error.toString());
-            }
-
-            return;
+            // tslint:disable-next-line: no-empty
+            } catch (e) {}
         }
+    }
 
-        return super.evaluateRequest(response, args);
+    private progressEvent(percent: number, message: string) {
+        this.sendEvent(new OutputEvent('progress', 'telemetry', {
+            percent,
+            message
+        }));
     }
 }
