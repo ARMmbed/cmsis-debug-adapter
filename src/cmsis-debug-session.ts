@@ -52,7 +52,6 @@ export class CmsisDebugSession extends GDBDebugSession {
     protected portScanner = new PortScanner();
     protected symbolTable!: SymbolTable;
     protected globalHandle!: number;
-    protected downloadProgress = 0;
 
     protected createBackend(): GDBBackend {
         return new CmsisBackend();
@@ -243,12 +242,12 @@ export class CmsisDebugSession extends GDBDebugSession {
         this.sendEvent(new OutputEvent(`Attached to debugger on port ${port}`));
 
         // Download image
-        this.progressEvent(0, 'Loading Image');
-        this.downloadProgress = 0;
-        this.gdb.on('statusAsync', this.downloadStatus.bind(this));
+        const progressListener = (percent: number) => this.progressEvent(percent, 'Loading Image');
+        progressListener(0);
+        this.gdbServer.on('progress', progressListener);
         await mi.sendTargetDownload(this.gdb);
-        this.gdb.off('statusAsync', this.downloadStatus.bind(this));
-        this.progressEvent(100, 'Loading Image');
+        this.gdbServer.off('progress', progressListener);
+        progressListener(100);
 
         if (args.runToMain === true) {
             await mi.sendBreakOnFunction(this.gdb);
@@ -325,26 +324,6 @@ export class CmsisDebugSession extends GDBDebugSession {
                 })
                 : 0,
         };
-    }
-
-    private downloadStatus(resultClass: string, resultData: any) {
-        if (resultClass === 'download') {
-            try {
-                if (resultData['total-size']) {
-                    const size = parseInt(resultData['total-size'], 10);
-
-                    if (resultData['total-sent']) {
-                        this.downloadProgress = parseInt(resultData['total-sent'], 10);
-                    } else if (resultData['section-size']) {
-                        this.downloadProgress += parseInt(resultData['section-size'], 10);
-                    }
-
-                    const percent = Math.round(this.downloadProgress * 100 / size);
-                    this.progressEvent(percent, 'Loading Image');
-                }
-            // tslint:disable-next-line: no-empty
-            } catch (e) {}
-        }
     }
 
     private progressEvent(percent: number, message: string) {
