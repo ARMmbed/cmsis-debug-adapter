@@ -234,12 +234,13 @@ export class CmsisDebugSession extends GDBDebugSession {
         this.progressEvent(0, 'Starting Debugger');
         await this.gdbServer.spawn(args);
         await this.spawn(args);
-        this.sendEvent(new OutputEvent(`Attached to debugger on port ${port}`));
 
         // Send commands
         await mi.sendTargetAsyncOn(this.gdb);
         await mi.sendTargetSelectRemote(this.gdb, remote);
         await mi.sendMonitorResetHalt(this.gdb);
+        await this.gdb.sendEnablePrettyPrint();
+        this.sendEvent(new OutputEvent(`Attached to debugger on port ${port}`));
 
         // Download image
         this.progressEvent(0, 'Loading Image');
@@ -248,9 +249,6 @@ export class CmsisDebugSession extends GDBDebugSession {
         await mi.sendTargetDownload(this.gdb);
         this.gdb.off('statusAsync', this.downloadStatus.bind(this));
         this.progressEvent(100, 'Loading Image');
-
-        await mi.sendMonitorResetHalt(this.gdb);
-        await this.gdb.sendEnablePrettyPrint();
 
         if (args.runToMain === true) {
             await mi.sendBreakOnFunction(this.gdb);
