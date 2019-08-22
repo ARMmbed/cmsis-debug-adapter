@@ -184,9 +184,11 @@ export class CmsisDebugSession extends GDBDebugSession {
 
     protected async disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments): Promise<void> {
         try {
+            await super.disconnectRequest(response, args);
             this.gdbServer.kill();
-            this.sendEvent(new TerminatedEvent(args && args.restart));
-            return super.disconnectRequest(response, args);
+            if (!args || !args.restart) {
+                this.sendEvent(new TerminatedEvent());
+            }
         } catch (err) {
             this.sendErrorResponse(response, 1, err.message);
         }
