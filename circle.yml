@@ -20,7 +20,7 @@ jobs:
       - attach_workspace:
           at: ./
       - run: tar cvzf package.tgz project
-      - run: ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete -replace ${CIRCLE_BRANCH}.$(echo $CIRCLE_SHA1 | cut -c -7) ./package.tgz
+      - run: ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete -replace ${CIRCLE_BRANCH} ./package.tgz
 
 workflows:
   version: 2
