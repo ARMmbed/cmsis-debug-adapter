@@ -57,7 +57,7 @@ builtin-modules@^1.1.1:
 
 cdt-gdb-adapter@ARMMbed/cdt-gdb-adapter#build:
   version "0.0.13"
-  resolved "https://codeload.github.com/ARMMbed/cdt-gdb-adapter/tar.gz/f63fcb58a3c85b20757ca0b90ff4ae71f5d2479a"
+  resolved "https://codeload.github.com/ARMMbed/cdt-gdb-adapter/tar.gz/58be28fcdd2f3c49af7dcbfd6a8f78dddf75a41e"
   dependencies:
     node-addon-api "^1.6.2"
     vscode-debugadapter "^1.32.1"
