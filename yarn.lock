@@ -57,7 +57,7 @@ builtin-modules@^1.1.1:
 
 cdt-gdb-adapter@ARMMbed/cdt-gdb-adapter#build:
   version "0.0.13"
-  resolved "https://codeload.github.com/ARMMbed/cdt-gdb-adapter/tar.gz/51b9961a110e50821ab94bc93d5786496a4d966e"
+  resolved "https://codeload.github.com/ARMMbed/cdt-gdb-adapter/tar.gz/2cdb9380b30423fbc32996ecfddd81a785a61985"
   dependencies:
     node-addon-api "^1.6.2"
     vscode-debugadapter "^1.32.1"
@@ -294,7 +294,7 @@ typescript@^3.1.6:
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-3.5.3.tgz#c830f657f93f1ea846819e929092f5fe5983e977"
   integrity sha512-ACzBtm/PhXBDId6a6sDJfroT2pOWt/oOnk4/dElG5G33ZL776N3Y6/6bKZJBFpd+b05F3Ct9qDjMeJmRWtE2/g==
 
-vscode-debugadapter@^1.26.0, vscode-debugadapter@^1.32.1:
+vscode-debugadapter@^1.26.0:
   version "1.35.0"
   resolved "https://registry.yarnpkg.com/vscode-debugadapter/-/vscode-debugadapter-1.35.0.tgz#d16dc32e93920a26ec5d6fe2330ba283600bcddb"
   integrity sha512-Au90Iowj6TuD5uDMaTnxOjl/9hQN0Yoky1TV1Cjjr7jPdxTQpALBRW09Y2LzkIXUVICXlAqxWL9zL8BpzI30jg==
@@ -302,10 +302,23 @@ vscode-debugadapter@^1.26.0, vscode-debugadapter@^1.32.1:
     mkdirp "^0.5.1"
     vscode-debugprotocol "1.35.0"
 
+vscode-debugadapter@^1.32.1:
+  version "1.36.0"
+  resolved "https://registry.yarnpkg.com/vscode-debugadapter/-/vscode-debugadapter-1.36.0.tgz#c5b9d4be20ac1831ab5bdc7ef483219cbcb475db"
+  integrity sha512-SYDoXAU4c54ZiHdz+Ib1mOZF876S1+dFrNJooa7VAg8sK4wTS0GJQGdqK52B5Hylff9bJJsPVTPIsI2+f9Zwjg==
+  dependencies:
+    mkdirp "^0.5.1"
+    vscode-debugprotocol "1.36.0"
+
 vscode-debugprotocol@1.35.0, vscode-debugprotocol@^1.26.0:
   version "1.35.0"
   resolved "https://registry.yarnpkg.com/vscode-debugprotocol/-/vscode-debugprotocol-1.35.0.tgz#565140cd42945e30c6c85cafb38c631457d4a46c"
   integrity sha512-+OMm11R1bGYbpIJ5eQIkwoDGFF4GvBz3Ztl6/VM+/RNNb2Gjk2c0Ku+oMmfhlTmTlPCpgHBsH4JqVCbUYhu5bA==
+
+vscode-debugprotocol@1.36.0:
+  version "1.36.0"
+  resolved "https://registry.yarnpkg.com/vscode-debugprotocol/-/vscode-debugprotocol-1.36.0.tgz#88e6246045480a9cc643e819b597396eaa9d0f4b"
+  integrity sha512-F0MfcUkF88TfNf4iQbcmC+K9rA+zsrQpEz1XpTKidy5sMq8sYsJGUadYDGmmktfjRX+S/ebjHgM+YV/2qm6lVQ==
 
 wrappy@1:
   version "1.0.2"
