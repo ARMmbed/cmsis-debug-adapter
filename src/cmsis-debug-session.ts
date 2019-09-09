@@ -240,7 +240,6 @@ export class CmsisDebugSession extends GDBDebugSession {
         await mi.sendTargetAsyncOn(this.gdb);
         await mi.sendTargetSelectRemote(this.gdb, remote);
         await mi.sendMonitorResetHalt(this.gdb);
-        await this.gdb.sendEnablePrettyPrint();
         this.sendEvent(new OutputEvent(`Attached to debugger on port ${port}`));
 
         // Download image
@@ -250,6 +249,10 @@ export class CmsisDebugSession extends GDBDebugSession {
         await mi.sendTargetDownload(this.gdb);
         this.gdbServer.off('progress', progressListener);
         progressListener(100);
+
+        // Halt after image download
+        await mi.sendMonitorResetHalt(this.gdb);
+        await this.gdb.sendEnablePrettyPrint();
 
         if (args.runToMain === true) {
             await mi.sendBreakOnFunction(this.gdb);
