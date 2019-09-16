@@ -28,6 +28,10 @@ import * as mi from './mi';
 
 export class CmsisBackend extends GDBBackend {
 
+    public get isRunning(): boolean {
+        return !!this.out;
+    }
+
     public pause() {
         mi.sendExecInterrupt(this);
         return true;
