@@ -184,24 +184,11 @@ export class CmsisDebugSession extends GDBDebugSession {
 
     protected async disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments): Promise<void> {
         try {
-            if (this.isRunning) {
-                // Need to pause first
-                const waitPromise = new Promise(resolve => this.waitPaused = resolve);
-                this.gdb.pause();
-                await waitPromise;
-            }
-            if ((this.gdb as CmsisBackend).isRunning) {
-                try {
-                    await mi.sendTargetDetach(this.gdb);
-                } catch (e) {
-                    // Need to catch here as the command result being returned will never exist as it's detached
-                }
-            }
-            await super.disconnectRequest(response, args);
-            this.gdbServer.kill();
+            this.stopSession();
             if (!args || !args.restart) {
                 this.sendEvent(new TerminatedEvent());
             }
+            this.sendResponse(response);
         } catch (err) {
             this.sendErrorResponse(response, 1, err.message);
         }
@@ -349,5 +336,33 @@ export class CmsisDebugSession extends GDBDebugSession {
             percent,
             message
         }));
+    }
+
+    protected async stopSession() {
+        // Pause debugging
+        if (this.isRunning) {
+            // Need to pause first
+            const waitPromise = new Promise(resolve => this.waitPaused = resolve);
+            this.gdb.pause();
+            await waitPromise;
+        }
+
+        // Detach
+        if ((this.gdb as CmsisBackend).isRunning) {
+            try {
+                await mi.sendTargetDetach(this.gdb);
+            } catch (e) {
+                // Need to catch here as the command result being returned will never exist as it's detached
+            }
+        }
+
+        // Stop gdb client and server
+        await this.gdb.sendGDBExit();
+        this.gdbServer.kill();
+    }
+
+    public async shutdown() {
+        await this.stopSession();
+        super.shutdown();
     }
 }
