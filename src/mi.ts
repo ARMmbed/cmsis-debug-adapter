@@ -72,4 +72,9 @@ export function sendUserInput(gdb: GDBBackend, command: string): Promise<any> {
     return gdb.sendCommand(command);
 }
 
+export function sendTargetDetach(gdb: GDBBackend) {
+    const command = '-target-detach';
+    return gdb.sendCommand(command);
+}
+
 export * from 'cdt-gdb-adapter/dist/mi';

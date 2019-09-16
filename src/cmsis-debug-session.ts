@@ -184,6 +184,19 @@ export class CmsisDebugSession extends GDBDebugSession {
 
     protected async disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments): Promise<void> {
         try {
+            if (this.isRunning) {
+                // Need to pause first
+                const waitPromise = new Promise(resolve => this.waitPaused = resolve);
+                this.gdb.pause();
+                await waitPromise;
+            }
+            if ((this.gdb as CmsisBackend).isRunning) {
+                try {
+                    await mi.sendTargetDetach(this.gdb);
+                } catch (e) {
+                    // Need to catch here as the command result being returned will never exist as it's detached
+                }
+            }
             await super.disconnectRequest(response, args);
             this.gdbServer.kill();
             if (!args || !args.restart) {
