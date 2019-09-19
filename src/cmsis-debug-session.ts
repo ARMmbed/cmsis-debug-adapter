@@ -208,8 +208,12 @@ export class CmsisDebugSession extends GDBDebugSession {
             throw message;
         });
 
-        this.symbolTable = new SymbolTable(args.program, args.objdump);
-        await this.symbolTable.loadSymbols();
+        try {
+            this.symbolTable = new SymbolTable(args.program, args.objdump);
+            await this.symbolTable.loadSymbols();
+        } catch (error) {
+            this.sendEvent(new OutputEvent(`Unable to load debug symbols: ${error.message}`));
+        }
 
         const port = await this.portScanner.findFreePort();
         if (!port) {

@@ -24,7 +24,7 @@
 * SOFTWARE.
 */
 
-import { exec } from 'child_process';
+import { spawnSync } from 'child_process';
 import { platform, EOL } from 'os';
 import { dirname, normalize, basename } from 'path';
 
@@ -78,42 +78,39 @@ export class SymbolTable {
     }
 
     public async loadSymbols(): Promise<void> {
-        try {
-            const results = await this.execute();
-            const output = results.toString();
-            const lines = output.split(EOL);
-            let currentFile: string | undefined = undefined;
+        const results = await this.execute();
+        const output = results.toString();
+        const lines = output.split(EOL);
+        let currentFile: string | undefined;
 
-            for (const line of lines) {
-                const match = line.match(SYMBOL_REGEX);
-                if (match) {
-                    if (match[7] === 'd' && match[8] === 'f') {
-                        currentFile = match[11].trim();
-                    }
-                    const type = TYPE_MAP[match[8]];
-                    const scope = SCOPE_MAP[match[2]];
-                    let name = match[11].trim();
-                    let hidden = false;
-
-                    if (name.startsWith('.hidden')) {
-                        name = name.substring(7).trim();
-                        hidden = true;
-                    }
-
-                    this.symbols.push({
-                        address: parseInt(match[1], 16),
-                        type: type,
-                        scope: scope,
-                        section: match[9].trim(),
-                        length: parseInt(match[10], 16),
-                        name: name,
-                        file: scope === SymbolScope.Local ? currentFile : undefined,
-                        hidden: hidden
-                    });
+        for (const line of lines) {
+            const match = line.match(SYMBOL_REGEX);
+            if (match) {
+                if (match[7] === 'd' && match[8] === 'f') {
+                    currentFile = match[11].trim();
                 }
+                const type = TYPE_MAP[match[8]];
+                const scope = SCOPE_MAP[match[2]];
+                let name = match[11].trim();
+                let hidden = false;
+
+                if (name.startsWith('.hidden')) {
+                    name = name.substring(7).trim();
+                    hidden = true;
+                }
+
+                this.symbols.push({
+                    address: parseInt(match[1], 16),
+                    type: type,
+                    scope: scope,
+                    section: match[9].trim(),
+                    length: parseInt(match[10], 16),
+                    name: name,
+                    file: scope === SymbolScope.Local ? currentFile : undefined,
+                    hidden: hidden
+                });
             }
-        // tslint:disable-next-line: no-empty
-        } catch (e) {}
+        }
     }
 
     public getGlobalVariables(): SymbolInformation[] {
@@ -131,20 +128,24 @@ export class SymbolTable {
 
     private execute(): Promise<string> {
         return new Promise((resolve, reject) => {
-            exec([
-                this.objdump,
-                '--syms',
-                `"${this.program}"`
-            ].join(' '), {
-                cwd: dirname(this.objdump),
-                windowsHide: true
-            }, (error: Error | null, stdout: string) => {
+            try {
+                const { stdout, stderr } = spawnSync(this.objdump, [
+                    '--syms',
+                    this.program
+                ], {
+                    cwd: dirname(this.objdump),
+                    windowsHide: true
+                });
+
+                const error = stderr.toString('utf8');
                 if (error) {
-                    return reject(error);
+                    return reject(new Error(error));
                 }
 
-                return resolve(stdout);
-            });
+                resolve(stdout.toString('utf8'));
+            } catch (error) {
+                return reject(new Error(error));
+            }
         });
     }
 }
