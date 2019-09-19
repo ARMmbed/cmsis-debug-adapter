@@ -361,7 +361,11 @@ export class CmsisDebugSession extends GDBDebugSession {
         }
 
         // Stop gdb client and server
-        await this.gdb.sendGDBExit();
+        try {
+            await this.gdb.sendGDBExit();
+        } catch (e) {
+            // Need to catch here in case the connection has already been closed
+        }
         this.gdbServer.kill();
     }
 
