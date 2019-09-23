@@ -77,4 +77,9 @@ export function sendTargetDetach(gdb: GDBBackend) {
     return gdb.sendCommand(command);
 }
 
+export function sendCatchAll(gdb: GDBBackend) {
+    const command = 'interpreter-exec console "catch throw"';
+    return gdb.sendCommand(command);
+}
+
 export * from 'cdt-gdb-adapter/dist/mi';

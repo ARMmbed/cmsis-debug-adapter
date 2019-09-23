@@ -45,6 +45,7 @@ export interface CmsisRequestArguments extends RequestArguments {
 const GLOBAL_HANDLE_ID = 0xFE;
 const STATIC_HANDLES_START = 0x010000;
 const STATIC_HANDLES_FINISH = 0x01FFFF;
+const EXCEPTION_FILTER = 'throw';
 
 export class CmsisDebugSession extends GDBDebugSession {
 
@@ -52,6 +53,7 @@ export class CmsisDebugSession extends GDBDebugSession {
     protected portScanner = new PortScanner();
     protected symbolTable!: SymbolTable;
     protected globalHandle!: number;
+    protected exceptionBreakpoints: string[] = [];
 
     protected createBackend(): GDBBackend {
         return new CmsisBackend();
@@ -372,5 +374,49 @@ export class CmsisDebugSession extends GDBDebugSession {
     public async shutdown() {
         await this.stopSession();
         super.shutdown();
+    }
+
+    protected initializeRequest(response: DebugProtocol.InitializeResponse, _args: DebugProtocol.InitializeRequestArguments): void {
+        response.body = response.body || {};
+        response.body.supportsConfigurationDoneRequest = true;
+        response.body.supportsSetVariable = true;
+        response.body.supportsConditionalBreakpoints = true;
+        // response.body.supportsSetExpression = true;
+        response.body.exceptionBreakpointFilters = [
+            {
+                label: 'All Exceptions',
+                filter: EXCEPTION_FILTER
+            }
+        ];
+        this.sendResponse(response);
+    }
+
+    protected async setExceptionBreakPointsRequest(response: DebugProtocol.SetExceptionBreakpointsResponse, args: DebugProtocol.SetExceptionBreakpointsArguments) {
+        try {
+            const getBreakPoints = async () => {
+                const result = await mi.sendBreakList(this.gdb);
+                return result.BreakpointTable.body
+                    .filter(breakpoint => (breakpoint as any)['catch-type'] === EXCEPTION_FILTER)
+                    .map(breakpoint => breakpoint.number);
+            };
+            this.exceptionBreakpoints = await getBreakPoints();
+
+            const set = !!args.filters.find(filter => filter === EXCEPTION_FILTER);
+
+            if (this.exceptionBreakpoints.length > 0 && !set) {
+                // Remove 'All Exceptions' breakpoints
+                await mi.sendBreakDelete(this.gdb, { breakpoints: this.exceptionBreakpoints });
+                this.exceptionBreakpoints = [];
+            }
+
+            if (this.exceptionBreakpoints.length === 0 && set) {
+                await mi.sendCatchAll(this.gdb);
+                this.exceptionBreakpoints = await getBreakPoints();
+            }
+
+            this.sendResponse(response);
+        } catch (err) {
+            this.sendErrorResponse(response, 1, err.message);
+        }
     }
 }
