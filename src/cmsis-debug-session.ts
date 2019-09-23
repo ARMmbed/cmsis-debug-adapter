@@ -23,9 +23,9 @@
 * SOFTWARE.
 */
 
-import { normalize } from 'path';
+import { normalize, basename } from 'path';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { Logger, logger, InitializedEvent, OutputEvent, Scope, TerminatedEvent } from 'vscode-debugadapter';
+import { Logger, logger, InitializedEvent, OutputEvent, Scope, TerminatedEvent, Source, StackFrame } from 'vscode-debugadapter';
 import { GDBDebugSession, RequestArguments, FrameVariableReference, FrameReference } from 'cdt-gdb-adapter/dist/GDBDebugSession';
 import { GDBBackend } from 'cdt-gdb-adapter/dist/GDBBackend';
 import { CmsisBackend } from './cmsis-backend';
@@ -34,6 +34,7 @@ import { PortScanner } from './port-scanner';
 import { SymbolTable } from './symbols';
 import * as varMgr from 'cdt-gdb-adapter/dist/varManager';
 import * as mi from './mi';
+import { StoppedEvent } from './stopped-event';
 
 export interface CmsisRequestArguments extends RequestArguments {
     runToMain?: boolean;
@@ -102,7 +103,36 @@ export class CmsisDebugSession extends GDBDebugSession {
                 frameId: -1
             });
 
-            return super.stackTraceRequest(response, args);
+            const depthResult = await mi.sendStackInfoDepth(this.gdb, { maxDepth: 100 });
+            const depth = parseInt(depthResult.depth, 10);
+            const levels = args.levels ? (args.levels > depth ? depth : args.levels) : depth;
+            const lowFrame = args.startFrame || 0;
+            const highFrame = lowFrame + levels - 1;
+            const listResult = await mi.sendStackListFramesRequest(this.gdb, { lowFrame, highFrame });
+
+            const stack = listResult.stack.map(frame => {
+                let source;
+                if (frame.fullname) {
+                    source = new Source(basename(frame.file || frame.fullname), frame.fullname);
+                }
+                let line;
+                if (frame.line) {
+                    line = parseInt(frame.line, 10);
+                }
+                const frameHandle = this.frameHandles.create({
+                    threadId: args.threadId,
+                    frameId: parseInt(frame.level, 10),
+                });
+                return new StackFrame(frameHandle, frame.func || frame.fullname || '', source, line);
+            })
+            .filter(frame => frame.source);
+
+            response.body = {
+                stackFrames: stack,
+                totalFrames: depth,
+            };
+
+            this.sendResponse(response);
         } catch (err) {
             this.sendErrorResponse(response, 1, err.message);
         }
@@ -417,6 +447,48 @@ export class CmsisDebugSession extends GDBDebugSession {
             this.sendResponse(response);
         } catch (err) {
             this.sendErrorResponse(response, 1, err.message);
+        }
+    }
+
+    protected sendStoppedEvent(reason: string, threadId: number, allThreadsStopped?: boolean, text?: string) {
+        // Reset frame handles and variables for new context
+        this.frameHandles.reset();
+        this.variableHandles.reset();
+        // Send the event
+        this.sendEvent(new StoppedEvent(reason, threadId, allThreadsStopped, text));
+    }
+
+    protected handleGDBStopped(result: any) {
+        const getThreadId = (resultData: any) => parseInt(resultData['thread-id'], 10);
+        const getAllThreadsStopped = (resultData: any) => {
+            return !!resultData['stopped-threads'] && resultData['stopped-threads'] === 'all';
+        };
+
+        switch (result.reason) {
+            case 'exited':
+            case 'exited-normally':
+                this.sendEvent(new TerminatedEvent());
+                break;
+            case 'breakpoint-hit':
+                if (this.exceptionBreakpoints.indexOf(result.bkptno) > -1) {
+                    this.sendStoppedEvent('exception', getThreadId(result), getAllThreadsStopped(result), 'an exception cropped up');
+                } else {
+                    this.sendStoppedEvent('breakpoint', getThreadId(result), getAllThreadsStopped(result));
+                }
+                break;
+            case 'end-stepping-range':
+            case 'function-finished':
+                this.sendStoppedEvent('step', getThreadId(result), getAllThreadsStopped(result));
+                break;
+            case 'signal-received':
+                const name = result['signal-name'] || 'signal';
+                this.sendStoppedEvent(name, getThreadId(result), getAllThreadsStopped(result));
+                if (this.waitPaused) {
+                    this.waitPaused();
+                }
+                break;
+            default:
+                this.sendStoppedEvent('generic', getThreadId(result), getAllThreadsStopped(result));
         }
     }
 }
