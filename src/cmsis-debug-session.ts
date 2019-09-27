@@ -54,6 +54,7 @@ export class CmsisDebugSession extends GDBDebugSession {
     protected portScanner = new PortScanner();
     protected symbolTable!: SymbolTable;
     protected globalHandle!: number;
+    protected logPointMessages: { [ key: string ]: string } = {};
 
     protected createBackend(): GDBBackend {
         return new CmsisBackend();
@@ -65,6 +66,7 @@ export class CmsisDebugSession extends GDBDebugSession {
         response.body.supportsSetVariable = true;
         response.body.supportsConditionalBreakpoints = true;
         response.body.supportsHitConditionalBreakpoints = true;
+        response.body.supportsLogPoints = true;
         this.sendResponse(response);
     }
 
@@ -150,6 +152,9 @@ export class CmsisDebugSession extends GDBDebugSession {
             await waitPromise;
         }
 
+        // Reset logPoint messages
+        this.logPointMessages = {};
+
         try {
             // Need to get the list of current breakpoints in the file and then make sure
             // that we end up with the requested set of breakpoints for that file
@@ -161,13 +166,22 @@ export class CmsisDebugSession extends GDBDebugSession {
             const deletes = new Array<string>();
 
             const actual = new Array<DebugProtocol.Breakpoint>();
+            const createActual = (breakpoint: mi.MIBreakpointInfo) => {
+                return {
+                    id: parseInt(breakpoint.number, 10),
+                    line: breakpoint.line ? parseInt(breakpoint.line, 10) : 0,
+                    verified: true,
+                };
+            };
 
             const result = await mi.sendBreakList(this.gdb);
             result.BreakpointTable.body.forEach(gdbbp => {
                 if (gdbbp.fullname === file && gdbbp.line) {
                     // TODO probably need more thorough checks than just line number
                     const line = parseInt(gdbbp.line, 10);
-                    if (!breakpoints.find(vsbp => vsbp.line === line)) {
+
+                    const breakpoint = breakpoints.find(vsbp => vsbp.line === line);
+                    if (!breakpoint) {
                         deletes.push(gdbbp.number);
                     }
 
@@ -181,11 +195,13 @@ export class CmsisDebugSession extends GDBDebugSession {
                         if (insertCond !== tableCond) {
                             return true;
                         }
-                        actual.push({
-                            verified: true,
-                            line: gdbbp.line ? parseInt(gdbbp.line, 10) : 0,
-                            id: parseInt(gdbbp.number, 10),
-                        });
+
+                        actual.push(createActual(gdbbp));
+
+                        if (breakpoint && breakpoint.logMessage) {
+                            this.logPointMessages[gdbbp.number] = breakpoint.logMessage;
+                        }
+
                         return false;
                     });
                 }
@@ -212,11 +228,11 @@ export class CmsisDebugSession extends GDBDebugSession {
                     temporary,
                     ignoreCount,
                 });
-                actual.push({
-                    id: parseInt(gdbbp.bkpt.number, 10),
-                    line: gdbbp.bkpt.line ? parseInt(gdbbp.bkpt.line, 10) : 0,
-                    verified: true,
-                });
+                actual.push(createActual(gdbbp.bkpt));
+
+                if (vsbp.logMessage) {
+                    this.logPointMessages[gdbbp.bkpt.number] = vsbp.logMessage;
+                }
             }
 
             response.body = {
@@ -234,6 +250,41 @@ export class CmsisDebugSession extends GDBDebugSession {
 
         if (neededPause) {
             mi.sendExecContinue(this.gdb);
+        }
+    }
+
+    protected handleGDBStopped(result: any) {
+        const getThreadId = (resultData: any) => parseInt(resultData['thread-id'], 10);
+        const getAllThreadsStopped = (resultData: any) => {
+            return !!resultData['stopped-threads'] && resultData['stopped-threads'] === 'all';
+        };
+
+        switch (result.reason) {
+            case 'exited':
+            case 'exited-normally':
+                this.sendEvent(new TerminatedEvent());
+                break;
+            case 'breakpoint-hit':
+                if (this.logPointMessages[result.bkptno]) {
+                    this.sendEvent(new OutputEvent(this.logPointMessages[result.bkptno]));
+                    mi.sendExecContinue(this.gdb);
+                } else {
+                    this.sendStoppedEvent('breakpoint', getThreadId(result), getAllThreadsStopped(result));
+                }
+                break;
+            case 'end-stepping-range':
+            case 'function-finished':
+                this.sendStoppedEvent('step', getThreadId(result), getAllThreadsStopped(result));
+                break;
+            case 'signal-received':
+                const name = result['signal-name'] || 'signal';
+                this.sendStoppedEvent(name, getThreadId(result), getAllThreadsStopped(result));
+                if (this.waitPaused) {
+                    this.waitPaused();
+                }
+                break;
+            default:
+                this.sendStoppedEvent('generic', getThreadId(result), getAllThreadsStopped(result));
         }
     }
 
