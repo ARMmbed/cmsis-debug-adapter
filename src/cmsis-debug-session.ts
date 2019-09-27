@@ -42,6 +42,8 @@ export interface CmsisRequestArguments extends RequestArguments {
     objdump?: string;
 }
 
+// Allow a single number for ignore count or the form '> [number]'
+const ignoreCountRegex = /\s|\>/g;
 const GLOBAL_HANDLE_ID = 0xFE;
 const STATIC_HANDLES_START = 0x010000;
 const STATIC_HANDLES_FINISH = 0x01FFFF;
@@ -55,6 +57,15 @@ export class CmsisDebugSession extends GDBDebugSession {
 
     protected createBackend(): GDBBackend {
         return new CmsisBackend();
+    }
+
+    protected initializeRequest(response: DebugProtocol.InitializeResponse, _args: DebugProtocol.InitializeRequestArguments): void {
+        response.body = response.body || {};
+        response.body.supportsConfigurationDoneRequest = true;
+        response.body.supportsSetVariable = true;
+        response.body.supportsConditionalBreakpoints = true;
+        response.body.supportsHitConditionalBreakpoints = true;
+        this.sendResponse(response);
     }
 
     protected async launchRequest(response: DebugProtocol.LaunchResponse, args: CmsisRequestArguments): Promise<void> {
@@ -124,6 +135,105 @@ export class CmsisDebugSession extends GDBDebugSession {
             this.sendResponse(response);
         } catch (err) {
             this.sendErrorResponse(response, 1, err.message);
+        }
+    }
+
+    protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): Promise<void> {
+
+        const neededPause = this.isRunning;
+        if (neededPause) {
+            // Need to pause first
+            const waitPromise = new Promise<void>(resolve => {
+                this.waitPaused = resolve;
+            });
+            this.gdb.pause();
+            await waitPromise;
+        }
+
+        try {
+            // Need to get the list of current breakpoints in the file and then make sure
+            // that we end up with the requested set of breakpoints for that file
+            // deleting ones not requested and inserting new ones.
+            const file = args.source.path as string;
+            const breakpoints = args.breakpoints || [];
+
+            let inserts = breakpoints.slice();
+            const deletes = new Array<string>();
+
+            const actual = new Array<DebugProtocol.Breakpoint>();
+
+            const result = await mi.sendBreakList(this.gdb);
+            result.BreakpointTable.body.forEach(gdbbp => {
+                if (gdbbp.fullname === file && gdbbp.line) {
+                    // TODO probably need more thorough checks than just line number
+                    const line = parseInt(gdbbp.line, 10);
+                    if (!breakpoints.find(vsbp => vsbp.line === line)) {
+                        deletes.push(gdbbp.number);
+                    }
+
+                    inserts = inserts.filter(vsbp => {
+                        if (vsbp.line !== line) {
+                            return true;
+                        }
+                        // Ensure we can compare undefined and empty strings
+                        const insertCond = vsbp.condition || undefined;
+                        const tableCond = gdbbp.cond || undefined;
+                        if (insertCond !== tableCond) {
+                            return true;
+                        }
+                        actual.push({
+                            verified: true,
+                            line: gdbbp.line ? parseInt(gdbbp.line, 10) : 0,
+                            id: parseInt(gdbbp.number, 10),
+                        });
+                        return false;
+                    });
+                }
+            });
+
+            for (const vsbp of inserts) {
+                let temporary = false;
+                let ignoreCount: number | undefined;
+
+                if (vsbp.hitCondition !== undefined) {
+                    // Allow hit condition continuously above the count
+                    temporary = !vsbp.hitCondition.startsWith('>');
+
+                    ignoreCount = parseInt(vsbp.hitCondition.replace(ignoreCountRegex, ''), 10);
+                    if (isNaN(ignoreCount)) {
+                        this.sendEvent(new OutputEvent(`Unable to decode expression: ${vsbp.hitCondition}`));
+                        continue;
+                    }
+                }
+
+                const gdbbp = await mi.sendBreak(this.gdb, {
+                    location: `${file}:${vsbp.line}`,
+                    condition: vsbp.condition,
+                    temporary,
+                    ignoreCount,
+                });
+                actual.push({
+                    id: parseInt(gdbbp.bkpt.number, 10),
+                    line: gdbbp.bkpt.line ? parseInt(gdbbp.bkpt.line, 10) : 0,
+                    verified: true,
+                });
+            }
+
+            response.body = {
+                breakpoints: actual,
+            };
+
+            if (deletes.length > 0) {
+                await mi.sendBreakDelete(this.gdb, { breakpoints: deletes });
+            }
+
+            this.sendResponse(response);
+        } catch (err) {
+            this.sendErrorResponse(response, 1, err.message);
+        }
+
+        if (neededPause) {
+            mi.sendExecContinue(this.gdb);
         }
     }
 

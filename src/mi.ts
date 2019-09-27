@@ -23,7 +23,7 @@
 * SOFTWARE.
 */
 
-import { MIFrameInfo } from 'cdt-gdb-adapter/dist/mi';
+import { MIFrameInfo, MIBreakInsertResponse } from 'cdt-gdb-adapter/dist/mi';
 import { GDBBackend } from 'cdt-gdb-adapter/dist/GDBBackend';
 
 export function sendTargetAsyncOn(gdb: GDBBackend) {
@@ -75,6 +75,30 @@ export function sendUserInput(gdb: GDBBackend, command: string): Promise<any> {
 export function sendTargetDetach(gdb: GDBBackend) {
     const command = '-target-detach';
     return gdb.sendCommand(command);
+}
+
+export async function sendBreak(gdb: GDBBackend, request: {
+    temporary?: boolean;
+    hardware?: boolean;
+    pending?: boolean;
+    disabled?: boolean;
+    tracepoint?: boolean;
+    condition?: string;
+    ignoreCount?: number;
+    threadId?: string;
+    location: string;
+}): Promise<MIBreakInsertResponse> {
+    // Todo: lots of options
+    const temp = request.temporary ? '-t ' : '';
+    const ignore = request.ignoreCount ? `-i ${request.ignoreCount} ` : '';
+    const escapedLocation = gdb.standardEscape(request.location);
+    const result = await gdb.sendCommand<MIBreakInsertResponse>(`-break-insert ${temp}${ignore}${escapedLocation}`);
+
+    if (request.condition) {
+        await gdb.sendCommand(`-break-condition ${result.bkpt.number} ${request.condition}`);
+    }
+
+    return result;
 }
 
 export * from 'cdt-gdb-adapter/dist/mi';
