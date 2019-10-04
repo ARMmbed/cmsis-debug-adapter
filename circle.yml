@@ -6,8 +6,14 @@ jobs:
       - image: circleci/node:10.2.1-stretch
     steps:
       - checkout
-      - run: yarn --frozen-lockfile
-      - run: yarn build
+      - run: yarn --frozen-lockfile --link-duplicates
+      - run: yarn --production --force --ignore-scripts --prefer-offline
+      - run: yarn autoclean --init
+      - run: echo *.ts >> .yarnclean
+      - run: echo *.ts.map >> .yarnclean
+      - run: echo *.spec.* >> .yarnclean
+      - run: yarn autoclean --force
+      - run: yarn cache clean
       - persist_to_workspace:
           root: ../
           paths:
