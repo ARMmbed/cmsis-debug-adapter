@@ -55,13 +55,14 @@ builtin-modules@^1.1.1:
   resolved "https://registry.yarnpkg.com/builtin-modules/-/builtin-modules-1.1.1.tgz#270f076c5a72c02f5b65a47df94c5fe3a278892f"
   integrity sha1-Jw8HbFpywC9bZaR9+Uxf46J4iS8=
 
-cdt-gdb-adapter@^0.0.14-next.4783033.0:
-  version "0.0.14-next.4783033.0"
-  resolved "https://registry.yarnpkg.com/cdt-gdb-adapter/-/cdt-gdb-adapter-0.0.14-next.4783033.0.tgz#cfec030fba7aaa32b8919c703433edbf853594de"
-  integrity sha512-tTGojza4Wd9jUjPAbPe5tmDKnJctpxoPFQ/BNB4sPWt2jv+f1ad3AO08JIOk+PW3DfV5AaNqfGXWtdt8OWvQZA==
+cdt-gdb-adapter@0.0.14-next.8084f52.0:
+  version "0.0.14-next.8084f52.0"
+  resolved "https://registry.yarnpkg.com/cdt-gdb-adapter/-/cdt-gdb-adapter-0.0.14-next.8084f52.0.tgz#e54ba65ddb7c59f89374c5d2e77104056a3a3f03"
+  integrity sha512-VxL0CNgNbDyYprDnibYipDDaaVlHk/6pqct54IuqNQFf2xGgB0HxFZ2ZMHt1L8HhIJ9kcPByTASrNVyvZNMbjQ==
   dependencies:
     node-addon-api "^1.6.2"
-    vscode-debugadapter "^1.32.1"
+    vscode-debugadapter "^1.37.1"
+    vscode-debugprotocol "^1.37.0"
 
 chalk@^2.0.0, chalk@^2.3.0:
   version "2.4.2"
@@ -303,7 +304,7 @@ vscode-debugadapter@^1.26.0:
     mkdirp "^0.5.1"
     vscode-debugprotocol "1.35.0"
 
-vscode-debugadapter@^1.32.1:
+vscode-debugadapter@^1.37.1:
   version "1.37.1"
   resolved "https://registry.yarnpkg.com/vscode-debugadapter/-/vscode-debugadapter-1.37.1.tgz#7d7076e64e9786fe4fcb0c156e1ed24184a9fb2b"
   integrity sha512-g/xNsUdkrd0DifaoRJ4+wypSMsMbK47fGpetpmIOnOQiDFjtYKvqxsgyUZ4BOj2jKP2Xa40B4YXfUUJpqreWJg==
@@ -316,7 +317,7 @@ vscode-debugprotocol@1.35.0, vscode-debugprotocol@^1.26.0:
   resolved "https://registry.yarnpkg.com/vscode-debugprotocol/-/vscode-debugprotocol-1.35.0.tgz#565140cd42945e30c6c85cafb38c631457d4a46c"
   integrity sha512-+OMm11R1bGYbpIJ5eQIkwoDGFF4GvBz3Ztl6/VM+/RNNb2Gjk2c0Ku+oMmfhlTmTlPCpgHBsH4JqVCbUYhu5bA==
 
-vscode-debugprotocol@1.37.0:
+vscode-debugprotocol@1.37.0, vscode-debugprotocol@^1.37.0:
   version "1.37.0"
   resolved "https://registry.yarnpkg.com/vscode-debugprotocol/-/vscode-debugprotocol-1.37.0.tgz#e8c4694a078d18ea1a639553a7a241b35c1e6f6d"
   integrity sha512-ppZLEBbFRVNsK0YpfgFi/x2CDyihx0F+UpdKmgeJcvi05UgSXYdO0n9sDVYwoGvvYQPvlpDQeWuY0nloOC4mPA==
