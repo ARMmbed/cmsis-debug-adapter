@@ -259,7 +259,7 @@ export class CmsisDebugSession extends GDBDebugSession {
         await this.gdb.sendEnablePrettyPrint();
 
         if (args.runToMain === true) {
-            await mi.sendBreakOnFunction(this.gdb);
+            await mi.sendBreakFunctionInsert(this.gdb, 'main');
         }
 
         this.sendEvent(new OutputEvent(`Image loaded: ${args.program}`));

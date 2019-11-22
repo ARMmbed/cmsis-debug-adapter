@@ -20,7 +20,7 @@
     "lint": "tslint --fix --project tsconfig.json"
   },
   "dependencies": {
-    "cdt-gdb-adapter": "0.0.14-next.8084f52.0",
+    "cdt-gdb-adapter": "0.0.14-next.5638382.0",
     "vscode-debugadapter": "^1.26.0",
     "vscode-debugprotocol": "^1.26.0"
   },

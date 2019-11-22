@@ -46,11 +46,6 @@ export function sendTargetDownload(gdb: GDBBackend) {
     return gdb.sendCommand(command);
 }
 
-export function sendBreakOnFunction(gdb: GDBBackend, fn: string = 'main') {
-    const command = `-break-insert -t --function ${fn}`;
-    return gdb.sendCommand(command);
-}
-
 export function sendExecInterrupt(gdb: GDBBackend, threadId?: number) {
     let command = '-exec-interrupt';
     if (threadId) {
