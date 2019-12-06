@@ -20,15 +20,15 @@
     "lint": "tslint --fix --project tsconfig.json"
   },
   "dependencies": {
-    "cdt-gdb-adapter": "0.0.14-next.5638382.0",
-    "vscode-debugadapter": "^1.26.0",
-    "vscode-debugprotocol": "^1.26.0"
+    "@types/node": "^12.12.14",
+    "cdt-gdb-adapter": "0.0.14-next.921da89.0",
+    "vscode-debugadapter": "^1.37.0",
+    "vscode-debugprotocol": "^1.37.0"
   },
   "devDependencies": {
-    "@types/node": "~10.3.6",
-    "tslint": "^5.9.1",
-    "tslint-eslint-rules": "^4.1.1",
-    "typescript": "^3.1.6"
+    "tslint": "^5.20.1",
+    "tslint-eslint-rules": "^5.4.0",
+    "typescript": "^3.7.3"
   },
   "bundledDependencies": [
     "cdt-gdb-adapter"

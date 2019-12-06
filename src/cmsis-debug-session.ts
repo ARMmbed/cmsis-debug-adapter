@@ -32,7 +32,6 @@ import { CmsisBackend } from './cmsis-backend';
 import { PyocdServer } from './pyocd-server';
 import { PortScanner } from './port-scanner';
 import { SymbolTable } from './symbols';
-import * as varMgr from 'cdt-gdb-adapter/dist/varManager';
 import * as mi from './mi';
 
 export interface CmsisRequestArguments extends RequestArguments {
@@ -301,7 +300,7 @@ export class CmsisDebugSession extends GDBDebugSession {
     }
 
     private async getVariables(frame: FrameReference, name: string, expression: string, depth: number): Promise<DebugProtocol.Variable> {
-        let global = varMgr.getVar(frame.frameId, frame.threadId, depth, name);
+        let global = this.gdb.varManager.getVar(frame.frameId, frame.threadId, depth, name);
 
         if (global) {
             // Update value if it is already loaded
@@ -318,7 +317,7 @@ export class CmsisDebugSession extends GDBDebugSession {
                 expression,
             });
 
-            global = varMgr.addVar(frame.frameId, frame.threadId, depth, name, true, false, varCreateResponse);
+            global = this.gdb.varManager.addVar(frame.frameId, frame.threadId, depth, name, true, false, varCreateResponse);
         }
 
         return {
