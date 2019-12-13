@@ -55,10 +55,10 @@ builtin-modules@^1.1.1:
   resolved "https://registry.yarnpkg.com/builtin-modules/-/builtin-modules-1.1.1.tgz#270f076c5a72c02f5b65a47df94c5fe3a278892f"
   integrity sha1-Jw8HbFpywC9bZaR9+Uxf46J4iS8=
 
-cdt-gdb-adapter@0.0.14-next.921da89.0:
-  version "0.0.14-next.921da89.0"
-  resolved "https://registry.yarnpkg.com/cdt-gdb-adapter/-/cdt-gdb-adapter-0.0.14-next.921da89.0.tgz#c070bc24cb41d0cefda490686917ed8c5c8f82dc"
-  integrity sha512-AMRpWY2/UgiW1Sntay9DRU+o0pPr1SN7hFnSqhzp8fTIK54Poyz/uxa82TSEvAH5wC5u3/cmNb0ANhYj1f7NJQ==
+cdt-gdb-adapter@0.0.14:
+  version "0.0.14"
+  resolved "https://registry.yarnpkg.com/cdt-gdb-adapter/-/cdt-gdb-adapter-0.0.14.tgz#0b4cc8650699572003e52a9f8265e9c65055339c"
+  integrity sha512-SDRVECyEkgePj0AJNVp8HUOw/ObXSlakQNxMasC1wlCn6eE8HcLAdYqdIgwRtnkp2Ct96/U5mXHFHWQDan6ckw==
   dependencies:
     node-addon-api "^1.6.2"
     vscode-debugadapter "^1.37.1"
