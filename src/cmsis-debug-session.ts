@@ -23,11 +23,12 @@
 * SOFTWARE.
 */
 
-import { normalize } from 'path';
+import { normalize, basename } from 'path';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { Logger, logger, InitializedEvent, OutputEvent, Scope, TerminatedEvent } from 'vscode-debugadapter';
+import { Logger, logger, InitializedEvent, OutputEvent, Scope, TerminatedEvent, StackFrame, Source } from 'vscode-debugadapter';
 import { GDBDebugSession, RequestArguments, FrameVariableReference, FrameReference } from 'cdt-gdb-adapter/dist/GDBDebugSession';
 import { GDBBackend } from 'cdt-gdb-adapter/dist/GDBBackend';
+import { MIFrameInfo } from 'cdt-gdb-adapter/dist/mi';
 import { CmsisBackend } from './cmsis-backend';
 import { PyocdServer } from './pyocd-server';
 import { PortScanner } from './port-scanner';
@@ -99,7 +100,43 @@ export class CmsisDebugSession extends GDBDebugSession {
                 frameId: -1
             });
 
-            return super.stackTraceRequest(response, args);
+            try {
+                const depthResult = await mi.sendStackInfoDepth(this.gdb, { maxDepth: 100 });
+                const depth = parseInt(depthResult.depth, 10);
+                const levels = args.levels ? (args.levels > depth ? depth : args.levels) : depth;
+                const lowFrame = args.startFrame || 0;
+                const highFrame = lowFrame + levels - 1;
+                const threadId = args.threadId;
+                const listResult = await mi.sendStackListFramesRequestWithThreadId(this.gdb, { lowFrame, highFrame, threadId });
+
+                const stack = listResult.stack.map((frame: MIFrameInfo) => {
+                    let source;
+                    if (frame.fullname) {
+                        source = new Source(basename(frame.file || frame.fullname), frame.fullname);
+                    }
+                    let line;
+                    if (frame.line) {
+                        line = parseInt(frame.line, 10);
+                    }
+                    const frameHandle = this.frameHandles.create({
+                        threadId: args.threadId,
+                        frameId: parseInt(frame.level, 10),
+                    });
+                    const name = frame.func || frame.fullname || '';
+                    const sf = new StackFrame(frameHandle, name, source, line) as DebugProtocol.StackFrame;
+                    sf.instructionPointerReference = frame.addr;
+                    return sf;
+                });
+
+                response.body = {
+                    stackFrames: stack,
+                    totalFrames: depth,
+                };
+
+                this.sendResponse(response);
+            } catch (err) {
+                this.sendErrorResponse(response, 1, err.message);
+            }
         } catch (err) {
             this.sendErrorResponse(response, 1, err.message);
         }
