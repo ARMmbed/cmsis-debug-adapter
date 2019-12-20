@@ -37,7 +37,7 @@ export function sendMonitorResetHalt(gdb: GDBBackend) {
 }
 
 export function sendTargetSelectRemote(gdb: GDBBackend, remote: string) {
-    const command = `-target-select extended-remote ${remote}`;
+    const command = `-target-select remote ${remote}`;
     return gdb.sendCommand(command);
 }
 
