@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@types/node": "^12.12.14",
-    "cdt-gdb-adapter": "0.0.15-next.20191219232234.cab0d05.0",
+    "cdt-gdb-adapter": "0.0.15-next.20191220232242.2160d3c.0",
     "vscode-debugadapter": "^1.37.0",
     "vscode-debugprotocol": "^1.37.0"
   },
