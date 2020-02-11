@@ -82,6 +82,11 @@
                 "type": "array",
                 "default": []
               },
+              "gdbCore": {
+                "description": "Core number gdb will connect to",
+                "type": "number",
+                "default": 0
+              },
               "gdbServer": {
                 "type": "string",
                 "description": "Path to gdb server",
@@ -137,6 +142,11 @@
                 "description": "Additional arguments to pass to GDB command line",
                 "type": "array",
                 "default": []
+              },
+              "gdbCore": {
+                "description": "Core number gdb will connect to",
+                "type": "number",
+                "default": 0
               },
               "gdbServer": {
                 "type": "string",

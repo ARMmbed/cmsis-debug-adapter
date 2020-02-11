@@ -36,6 +36,7 @@ import * as mi from './mi';
 
 export interface CmsisRequestArguments extends RequestArguments {
     runToMain?: boolean;
+    gdbCore?: number;
     gdbServer?: string;
     gdbServerArguments?: string[];
     objdump?: string;
@@ -47,7 +48,7 @@ const STATIC_HANDLES_FINISH = 0x01FFFF;
 
 export class CmsisDebugSession extends GDBDebugSession {
 
-    protected gdbServer = new PyocdServer();
+    protected gdbServer: PyocdServer | undefined;
     protected portScanner = new PortScanner();
     protected symbolTable!: SymbolTable;
     protected globalHandle!: number;
@@ -200,13 +201,7 @@ export class CmsisDebugSession extends GDBDebugSession {
         this.gdb.on('execAsync', (resultClass, resultData) => this.handleGDBAsync(resultClass, resultData));
         this.gdb.on('notifyAsync', (resultClass, resultData) => this.handleGDBNotify(resultClass, resultData));
 
-        // gdb server has main info channel on stderr
-        this.gdbServer.on('stderr', data => this.sendEvent(new OutputEvent(data, 'stdout')));
-        this.gdbServer.on('error', message => {
-            this.sendEvent(new TerminatedEvent());
-            throw message;
-        });
-
+        // Load debug symbols
         try {
             this.symbolTable = new SymbolTable(args.program, args.objdump);
             await this.symbolTable.loadSymbols();
@@ -214,13 +209,12 @@ export class CmsisDebugSession extends GDBDebugSession {
             this.sendEvent(new OutputEvent(`Unable to load debug symbols: ${error.message}`));
         }
 
-        const port = await this.portScanner.findFreePort();
-        if (!port) {
+        // Determine free port for gdb server
+        const serverPort = await this.portScanner.findFreePort();
+        if (!serverPort) {
             throw new Error('Unable to find a free port to use for debugging');
         }
-        this.sendEvent(new OutputEvent(`Selected port ${port} for debugging`));
-
-        const remote = `localhost:${port}`;
+        this.sendEvent(new OutputEvent(`Selected port ${serverPort} for debugging`));
 
         // Set gdb arguments
         if (!args.gdbArguments) {
@@ -232,18 +226,30 @@ export class CmsisDebugSession extends GDBDebugSession {
         if (!args.gdbServerArguments) {
             args.gdbServerArguments = [];
         }
-        args.gdbServerArguments.push('--port', port.toString());
+        args.gdbServerArguments.push('--port', serverPort.toString());
 
-        // Start gdb client and server
+        // gdb server has main info channel on stderr
+        this.gdbServer = new PyocdServer(args);
+        this.gdbServer.on('stderr', data => this.sendEvent(new OutputEvent(data, 'stdout')));
+        this.gdbServer.on('error', message => {
+            this.sendEvent(new TerminatedEvent());
+            throw message;
+        });
+
+        // Start gdb server and client
         this.progressEvent(0, 'Starting Debugger');
-        await this.gdbServer.spawn(args);
+        await this.gdbServer.spawn();
         await this.spawn(args);
+
+        // Find correct debug client port
+        const clientPort = this.gdbServer.resolveGdbPort(serverPort);
+        const remote = `localhost:${clientPort}`;
 
         // Send commands
         await mi.sendTargetAsyncOn(this.gdb);
         await mi.sendTargetSelectRemote(this.gdb, remote);
         await mi.sendMonitorResetHalt(this.gdb);
-        this.sendEvent(new OutputEvent(`Attached to debugger on port ${port}`));
+        this.sendEvent(new OutputEvent(`Attached to debugger on port ${clientPort}`));
 
         // Download image
         const progressListener = (percent: number) => this.progressEvent(percent, 'Loading Image');
@@ -365,7 +371,10 @@ export class CmsisDebugSession extends GDBDebugSession {
         } catch (e) {
             // Need to catch here in case the connection has already been closed
         }
-        this.gdbServer.kill();
+
+        if (this.gdbServer) {
+            this.gdbServer.kill();
+        }
     }
 
     public async shutdown() {
