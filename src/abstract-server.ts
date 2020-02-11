@@ -41,7 +41,11 @@ export abstract class AbstractServer extends EventEmitter {
     protected launchReject?: (error: any) => void;
     protected timer?: NodeJS.Timer;
 
-    public spawn(args: CmsisRequestArguments): Promise<void> {
+    constructor(protected args: CmsisRequestArguments) {
+        super();
+    }
+
+    public spawn(): Promise<void> {
         return new Promise(async (resolve, reject) => {
             this.launchResolve = resolve;
             this.launchReject = reject;
@@ -49,8 +53,8 @@ export abstract class AbstractServer extends EventEmitter {
             try {
                 this.timer = setTimeout(() => this.onSpawnError(new Error('Timeout waiting for gdb server to start')), TIMEOUT);
 
-                const command = args.gdbServer || 'gdb-server';
-                const serverArguments = await this.resolveServerArguments(args.gdbServerArguments);
+                const command = this.args.gdbServer || 'gdb-server';
+                const serverArguments = await this.resolveServerArguments(this.args.gdbServerArguments);
                 this.process = spawn(command, serverArguments, {
                     cwd: dirname(command),
                 });
@@ -78,6 +82,10 @@ export abstract class AbstractServer extends EventEmitter {
         if (this.process) {
             this.process.kill('SIGINT');
         }
+    }
+
+    public resolveGdbPort(port: number): number {
+        return port;
     }
 
     protected async resolveServerArguments(serverArguments?: string[]): Promise<string[]> {
