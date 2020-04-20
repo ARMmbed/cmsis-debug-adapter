@@ -110,23 +110,23 @@ export abstract class AbstractServer extends EventEmitter {
     }
 
     protected onStdout(chunk: string | Buffer) {
-        this.onData(chunk, this.outBuffer, 'stdout');
+        this.onData(chunk, 'stdout');
     }
 
     protected onStderr(chunk: string | Buffer) {
-        this.onData(chunk, this.errBuffer, 'stderr');
+        this.onData(chunk, 'stderr');
     }
 
-    protected onData(chunk: string | Buffer, buffer: string, event: string) {
-        buffer += typeof chunk === 'string' ? chunk
-                : chunk.toString('utf8');
+    protected onData(chunk: string | Buffer, event: 'stdout' | 'stderr') {
+        const bufferName = event === 'stdout' ? 'outBuffer' : 'errBuffer';
+        this[bufferName] += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
 
-        const end = buffer.lastIndexOf('\n');
+        const end = this[bufferName].lastIndexOf('\n');
         if (end !== -1) {
-            const data = buffer.substring(0, end);
+            const data = this[bufferName].substring(0, end);
             this.emit(event, data);
             this.handleData(data);
-            buffer = buffer.substring(end + 1);
+            this[bufferName] = this[bufferName].substring(end + 1);
         }
     }
 
