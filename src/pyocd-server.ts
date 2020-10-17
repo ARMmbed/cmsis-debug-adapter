@@ -36,7 +36,7 @@ export class PyocdServer extends AbstractServer {
     protected progress = 0;
 
     public resolveGdbPort(port: number): number {
-        if (this.args.gdbCore) {
+        if (this.args.gdbCore && this.args.gdbCore > 0) {
             // PyOCD starts each core on a subsequent port
             // (e.g. core 0 on starting port, core 1 on starting port +1, etc.)
             port += this.args.gdbCore;
