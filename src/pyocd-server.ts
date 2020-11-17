@@ -63,6 +63,13 @@ export class PyocdServer extends AbstractServer {
         ];
     }
 
+    protected resolveServerEnv(): NodeJS.ProcessEnv {
+        // Remove env variables and reset PATH
+        return {
+            PATH: ''
+        }
+    }
+
     protected onStdout(chunk: string | Buffer) {
         super.onStdout(chunk);
         const buffer = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
