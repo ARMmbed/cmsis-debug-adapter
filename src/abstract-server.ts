@@ -29,6 +29,7 @@ import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import { dirname } from 'path';
 import { CmsisRequestArguments } from './cmsis-debug-session';
+import * as nodeProcess from 'process';
 
 const TIMEOUT = 1000 * 10; // 10 seconds
 
@@ -57,6 +58,7 @@ export abstract class AbstractServer extends EventEmitter {
                 const serverArguments = await this.resolveServerArguments(this.args.gdbServerArguments);
                 this.process = spawn(command, serverArguments, {
                     cwd: dirname(command),
+                    env: this.resolveServerEnv(this.args.gdbServerEnv ? this.args.gdbServerEnv as NodeJS.ProcessEnv : undefined )
                 });
 
                 if (!this.process) {
@@ -90,6 +92,10 @@ export abstract class AbstractServer extends EventEmitter {
 
     protected async resolveServerArguments(serverArguments?: string[]): Promise<string[]> {
         return serverArguments || [];
+    }
+
+    private resolveServerEnv(serverEnv?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+        return serverEnv || nodeProcess.env;
     }
 
     protected onExit(code: number, signal: string) {
