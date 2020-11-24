@@ -97,6 +97,10 @@
                 "type": "array",
                 "default": []
               },
+              "gdbServerEnv": {
+                "description": "GDB server process env",
+                "type": "object"
+              },
               "objdump": {
                 "type": "string",
                 "description": "Path to objdump executable",
@@ -157,6 +161,10 @@
                 "description": "Additional arguments to pass to GDB server",
                 "type": "array",
                 "default": []
+              },
+              "gdbServerEnv": {
+                "description": "GDB server process env",
+                "type": "object"
               },
               "objdump": {
                 "type": "string",
