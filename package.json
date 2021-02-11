@@ -1,16 +1,18 @@
 {
   "name": "cmsis-debug-adapter",
   "version": "1.0.0",
+  "publisher": "Arm Mbed",
   "description": "Debug adapter for CMSIS following the DAP protocol",
   "author": "Rob Moran <rob.moran@arm.com>",
   "license": "MIT",
   "private": true,
-  "main": "./lib/index",
+  "main": "./lib/index.js",
   "repository": {
     "type": "git",
     "url": "git://github.com/ARMmbed/cmsis-debug-adapter"
   },
   "engines": {
+    "vscode": "^1.49.0",
     "node": ">=10.2.1"
   },
   "scripts": {
@@ -33,7 +35,6 @@
   "bundledDependencies": [
     "cdt-gdb-adapter"
   ],
-  "publisher": "Arm Mbed",
   "activationEvents": [
     "onDebugResolve:cmsis-debug"
   ],
