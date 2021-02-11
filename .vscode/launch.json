@@ -2,18 +2,36 @@
     "version": "0.2.0",
     "configurations": [
 		{
+			"name": "Extension",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"${workspaceFolder}/sample-workspace"
+			],
+			"outFiles": [
+				"${workspaceFolder}/lib/**/*.js"
+			]
+		},
+		{
+			"name": "Server",
 			"type": "node",
 			"request": "launch",
-			"name": "Debug Server",
 			"runtimeArgs": [ "--nolazy" ],
 			"program": "${workspaceRoot}/src/index.ts",
 			"stopOnEntry": false,
 			"args": [ "--server=4711" ],
 			"sourceMaps": true,
 			"outFiles": [
-				"${workspaceRoot}/lib/**/*.js"
+				"${workspaceFolder}/lib/**/*.js"
 			],
-			"cwd": "${workspaceRoot}"
+			"cwd": "${workspaceFolder}"
         }
-    ]
+    ],
+	"compounds": [
+		{
+			"name": "Extension + Server",
+			"configurations": [ "Extension", "Server" ]
+		}
+	]
 }
