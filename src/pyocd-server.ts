@@ -1,27 +1,27 @@
 /*
-* CMSIS Debug Adapter
-* Copyright (c) 2019 Arm Limited
-*
-* The MIT License (MIT)
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*/
+ * CMSIS Debug Adapter
+ * Copyright (c) 2019 Arm Limited
+ *
+ * The MIT License (MIT)
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
 import { AbstractServer } from './abstract-server';
 import { PortScanner } from './port-scanner';
@@ -34,8 +34,15 @@ export class PyocdServer extends AbstractServer {
 
     protected portScanner = new PortScanner();
     protected progress = 0;
+    protected serverPort: number | undefined;
 
-    public resolveGdbPort(port: number): number {
+    public resolveGdbPort(): number {
+        if (!this.serverPort) {
+            throw new Error('Server port not set');
+        }
+
+        let port = this.serverPort;
+
         if (this.args.gdbCore && this.args.gdbCore > 0) {
             // PyOCD starts each core on a subsequent port
             // (e.g. core 0 on starting port, core 1 on starting port +1, etc.)
@@ -50,17 +57,29 @@ export class PyocdServer extends AbstractServer {
             serverArguments = [];
         }
 
-        const telnetPort = await this.portScanner.findFreePort(4444);
-
-        if (!telnetPort) {
-            return serverArguments;
+        // Determine free port for gdb server
+        this.serverPort = await this.portScanner.findFreePort();
+        if (!this.serverPort) {
+            throw new Error('Unable to find a free port to use for debugging');
         }
 
-        return [
-            ...serverArguments,
-            '--telnet-port',
-            telnetPort.toString()
-        ];
+        serverArguments.push(
+            '--port',
+            this.serverPort.toString()
+        );
+
+        this.emit('info', `Selected port ${this.serverPort} for debugging`);
+
+        const telnetPort = await this.portScanner.findFreePort(4444);
+
+        if (telnetPort) {
+            serverArguments.push(
+                '--telnet-port',
+                telnetPort.toString()
+            );
+        }
+
+        return serverArguments;
     }
 
     protected onStdout(chunk: string | Buffer) {
@@ -70,7 +89,7 @@ export class PyocdServer extends AbstractServer {
 
         if (match) {
             this.progress += match.length;
-            const percent = Math.round(this.progress * PERCENT_MULTIPLIER);
+            const percent = Math.round(this.progress  * PERCENT_MULTIPLIER);
             this.emit('progress', percent);
         }
     }

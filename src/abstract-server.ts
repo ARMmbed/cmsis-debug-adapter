@@ -54,7 +54,7 @@ export abstract class AbstractServer extends EventEmitter {
             try {
                 this.timer = setTimeout(() => this.onSpawnError(new Error('Timeout waiting for gdb server to start')), TIMEOUT);
 
-                const command = this.args.gdbServer || 'gdb-server';
+                const command = this.getCommand();
                 const serverArguments = await this.resolveServerArguments(this.args.gdbServerArguments);
                 this.process = spawn(command, serverArguments, {
                     cwd: dirname(command),
@@ -80,15 +80,17 @@ export abstract class AbstractServer extends EventEmitter {
         });
     }
 
+    protected getCommand(): string {
+        return this.args.gdbServer || 'gdb-server';
+    }
+
     public kill() {
         if (this.process) {
             this.process.kill('SIGINT');
         }
     }
 
-    public resolveGdbPort(port: number): number {
-        return port;
-    }
+    public abstract resolveGdbPort(): number;
 
     protected async resolveServerArguments(serverArguments?: string[]): Promise<string[]> {
         return serverArguments || [];
@@ -131,6 +133,7 @@ export abstract class AbstractServer extends EventEmitter {
         if (end !== -1) {
             const data = this[bufferName].substring(0, end);
             this.emit(event, data);
+            this.emit('info', data);
             this.handleData(data);
             this[bufferName] = this[bufferName].substring(end + 1);
         }
